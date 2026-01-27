@@ -135,9 +135,7 @@ async function fetchTranscript(videoId) {
     if (transcript) {
       return transcript;
     }
-
-    // Fallback to YouTube's timedtext API if YTT fails
-    return await fetchYouTubeTranscriptAlternative(videoId);
+    return null;
   } catch (error) {
     console.error('Error fetching transcript:', error);
     return null;
