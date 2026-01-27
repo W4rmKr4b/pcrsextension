@@ -5,7 +5,7 @@ A Chrome extension that scrapes YouTube videos from UofT's PCRS learning system,
 ## Features
 
 - 🎥 Automatically scrapes YouTube video links from PCRS pages
-- 📝 Fetches video transcripts (using YouTube's API)
+- 📝 Fetches video transcripts via YouTubeToTranscript.com
 - 🤖 Generates concise summaries using OpenAI's ChatGPT
 - 🔢 Enumerates summaries for easy reference
 - 💾 Stores your OpenAI API key securely in browser storage
@@ -19,14 +19,19 @@ A Chrome extension that scrapes YouTube videos from UofT's PCRS learning system,
 3. Navigate to API Keys section
 4. Create a new API key and copy it
 
-### Step 2: Install the Extension
+### Step 2: Get Your YouTubeToTranscript API Key
+
+1. Obtain an API key for YouTubeToTranscript.com from your provider
+2. Copy the API key for use in the extension
+
+### Step 3: Install the Extension
 
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable "Developer mode" (toggle in top-right corner)
 3. Click "Load unpacked"
 4. Select the folder containing this extension's files
 
-### Step 3: Add Icons (Optional)
+### Step 4: Add Icons (Optional)
 
 Icons are optional. If you want custom icons, add three PNG files: `icon16.png`, `icon48.png`, and `icon128.png`. You can:
 - Create simple icons yourself (16x16, 48x48, and 128x128 pixels)
@@ -37,11 +42,11 @@ Place these PNG files in the extension's root directory.
 
 ## Usage
 
-### Step 1: Configure API Key
+### Step 1: Configure API Keys
 
 1. Click the extension icon in Chrome's toolbar
-2. Enter your OpenAI API key in the input field
-3. Click "Save Key"
+2. Enter your OpenAI API key and click "Save Key"
+3. Enter your YouTubeToTranscript API key and click "Save Key"
 
 ### Step 2: Scrape Videos
 
@@ -78,7 +83,7 @@ pcrsextension/
 
 1. **Content Script** (`content.js`): Runs on PCRS pages and extracts YouTube video links
 2. **Popup** (`popup.html/js`): Provides the user interface for interacting with the extension
-3. **Transcript Fetching**: Uses YouTube's timedtext API to retrieve video transcripts
+3. **Transcript Fetching**: Uses YouTubeToTranscript.com to retrieve video transcripts
 4. **Summary Generation**: Sends transcripts to OpenAI's GPT-3.5-turbo model for summarization
 5. **Display**: Shows enumerated summaries with video titles and transcript previews
 
@@ -91,7 +96,7 @@ pcrsextension/
 
 ### Transcript Availability
 - Not all YouTube videos have transcripts
-- The extension tries to fetch transcripts using YouTube's API
+- The extension uses YouTubeToTranscript.com as the primary source
 - If a transcript isn't available, you'll see an error message for that video
 
 ### PCRS Page Compatibility
@@ -111,9 +116,9 @@ pcrsextension/
 - The extension will skip videos without transcripts
 
 ### API Errors
-- Verify your API key is correct
+- Verify both API keys are correct
 - Check your OpenAI account has credits
-- Ensure your API key has proper permissions
+- Ensure your YouTubeToTranscript API key is active
 
 ### Extension Not Loading
 - Make sure all files are in the same directory
@@ -122,8 +127,8 @@ pcrsextension/
 
 ## Privacy
 
-- Your OpenAI API key is stored locally in Chrome's storage
-- No data is sent to any third parties except OpenAI
+- Your API keys are stored locally in Chrome's storage
+- No data is sent to any third parties except OpenAI and YouTubeToTranscript.com
 - The extension only runs on PCRS pages you explicitly visit
 
 ## Future Enhancements

@@ -48,12 +48,13 @@ python3 create_icons.py
 5. Select the `/workspaces/pcrsextension` folder
 6. The extension should now appear in your extensions list
 
-### 3. Configure Your API Key
+### 3. Configure Your API Keys
 
 1. Get an OpenAI API key from https://platform.openai.com/
-2. Click the extension icon in Chrome
-3. Enter your API key
-4. Click "Save Key"
+2. Get a YouTubeToTranscript API key from your provider
+3. Click the extension icon in Chrome
+4. Enter your OpenAI API key and click "Save Key"
+5. Enter your YouTubeToTranscript API key and click "Save Key"
 
 ### 4. Use the Extension
 
@@ -76,8 +77,9 @@ python3 create_icons.py
 
 **API Errors:**
 - Verify your OpenAI API key is valid
+- Verify your YouTubeToTranscript API key is valid
 - Check you have credits in your OpenAI account
-- Make sure the key has proper permissions
+- Make sure the keys have proper permissions
 
 **Extension Not Loading:**
 - Ensure all files are in the same folder

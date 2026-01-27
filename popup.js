@@ -1,13 +1,18 @@
 // Popup script to handle user interactions
 let scrapedVideos = [];
 let apiKey = '';
+let yttApiKey = '';
 
 // Load saved API key on popup open
 document.addEventListener('DOMContentLoaded', async () => {
-  const result = await chrome.storage.local.get(['openaiApiKey']);
+  const result = await chrome.storage.local.get(['openaiApiKey', 'yttApiKey']);
   if (result.openaiApiKey) {
     apiKey = result.openaiApiKey;
     document.getElementById('apiKey').value = '••••••••';
+  }
+  if (result.yttApiKey) {
+    yttApiKey = result.yttApiKey;
+    document.getElementById('yttApiKey').value = '••••••••';
   }
 });
 
@@ -21,6 +26,19 @@ document.getElementById('saveApiKey').addEventListener('click', async () => {
     apiKey = key;
     input.value = '••••••••';
     showStatus('API key saved successfully!', 'success');
+  }
+});
+
+// Save YouTubeToTranscript API key
+document.getElementById('saveYttApiKey').addEventListener('click', async () => {
+  const input = document.getElementById('yttApiKey');
+  const key = input.value;
+
+  if (key && key !== '••••••••') {
+    await chrome.storage.local.set({ yttApiKey: key });
+    yttApiKey = key;
+    input.value = '••••••••';
+    showStatus('YouTubeToTranscript API key saved successfully!', 'success');
   }
 });
 
@@ -58,6 +76,15 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
       return;
     }
     apiKey = result.openaiApiKey;
+  }
+
+  if (!yttApiKey || yttApiKey === '••••••••') {
+    const result = await chrome.storage.local.get(['yttApiKey']);
+    if (!result.yttApiKey) {
+      showStatus('Please enter your YouTubeToTranscript API key first!', 'error');
+      return;
+    }
+    yttApiKey = result.yttApiKey;
   }
   
   if (scrapedVideos.length === 0) {
@@ -104,30 +131,102 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
 // Fetch transcript from youtubetotranscript.com
 async function fetchTranscript(videoId) {
   try {
-    // Method 1: Try to scrape youtubetotranscript.com
-    const url = `https://youtubetotranscript.com/?v=${videoId}`;
-    
-    // Since we can't directly fetch from the site due to CORS, 
-    // we'll use YouTube's built-in transcript API as a fallback
-    const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
-    const html = await response.text();
-    
-    // Try to extract captions/transcript data from YouTube page
-    // This is a simplified approach - in production, you might want to use YouTube API
-    const captionsMatch = html.match(/"captions":\s*({[^}]+})/);
-    
-    if (captionsMatch) {
-      // For now, we'll return a placeholder
-      // In a real implementation, you'd parse the captions URL and fetch the actual transcript
-      return await fetchYouTubeTranscriptAlternative(videoId);
+    const transcript = await fetchTranscriptFromYTT(videoId, yttApiKey);
+    if (transcript) {
+      return transcript;
     }
-    
+
+    // Fallback to YouTube's timedtext API if YTT fails
     return await fetchYouTubeTranscriptAlternative(videoId);
-    
   } catch (error) {
     console.error('Error fetching transcript:', error);
     return null;
   }
+}
+
+async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
+  const url = new URL('https://youtubetotranscript.com/');
+  url.searchParams.set('v', videoId);
+  if (apiKeyValue) {
+    url.searchParams.set('key', apiKeyValue);
+    url.searchParams.set('api_key', apiKeyValue);
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      'x-api-key': apiKeyValue || '',
+      'Authorization': apiKeyValue ? `Bearer ${apiKeyValue}` : ''
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`YouTubeToTranscript error ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const bodyText = await response.text();
+
+  if (contentType.includes('application/json') || bodyText.trim().startsWith('{')) {
+    try {
+      const data = JSON.parse(bodyText);
+      const transcriptText = data?.transcript || data?.text || data?.data?.transcript;
+      return normalizeTranscriptText(transcriptText || '');
+    } catch (error) {
+      console.warn('Failed to parse JSON transcript:', error);
+    }
+  }
+
+  return extractTranscriptFromHtml(bodyText);
+}
+
+function extractTranscriptFromHtml(htmlText) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, 'text/html');
+
+    const selectors = [
+      '#transcript',
+      '#transcript-text',
+      '.transcript',
+      '.transcript-text',
+      '#transcript-container',
+      '.captions-text',
+      'textarea#transcript',
+      'textarea#transcript-text',
+      'pre'
+    ];
+
+    for (const selector of selectors) {
+      const element = doc.querySelector(selector);
+      const text = element?.value || element?.textContent || '';
+      const normalized = normalizeTranscriptText(text);
+      if (normalized) {
+        return normalized;
+      }
+    }
+
+    const timedNodes = doc.querySelectorAll('[data-start], [data-time], .cue, .segment-text');
+    if (timedNodes.length > 0) {
+      const combined = Array.from(timedNodes)
+        .map(node => node.textContent || '')
+        .join(' ');
+      const normalized = normalizeTranscriptText(combined);
+      if (normalized) {
+        return normalized;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to parse YouTubeToTranscript HTML:', error);
+  }
+
+  return '';
+}
+
+function normalizeTranscriptText(text) {
+  return (text || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    .trim();
 }
 
 function sleep(ms) {
