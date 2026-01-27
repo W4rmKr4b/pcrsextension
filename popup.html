@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCRS Video Summarizer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>PCRS Video Summarizer</h1>
+    
+    <div class="settings-section">
+      <label for="apiKey">OpenAI API Key:</label>
+      <input type="password" id="apiKey" placeholder="Enter your OpenAI API key">
+      <button id="saveApiKey">Save Key</button>
+    </div>
+
+    <div class="action-section">
+      <button id="scrapeVideos" class="btn-primary">Scrape Videos</button>
+      <button id="generateSummaries" class="btn-primary" disabled>Generate Summaries</button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div id="videoList" class="video-list"></div>
+
+    <div id="summaries" class="summaries"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

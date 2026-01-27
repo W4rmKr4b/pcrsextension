@@ -1,0 +1,33 @@
+ICON FILES NEEDED
+=================
+
+This extension requires three icon files:
+- icon16.png (16x16 pixels)
+- icon48.png (48x48 pixels)
+- icon128.png (128x128 pixels)
+
+You can create these in several ways:
+
+1. Use an online icon generator:
+   - https://www.favicon-generator.org/
+   - https://realfavicongenerator.net/
+
+2. Use a graphics editor like:
+   - GIMP (free)
+   - Photoshop
+   - Canva (online, free)
+
+3. Use the temp_icon.svg file in this directory:
+   - Open it in Inkscape or any SVG editor
+   - Export as PNG at the three sizes listed above
+
+4. Use simple colored squares as placeholders:
+   - Any image editor can create these quickly
+
+Design suggestions:
+- Use blue (#2196F3) as the background
+- Add "PS" or "PCRS" text in white
+- Keep it simple and recognizable
+- Make sure the design is clear at 16x16 pixels
+
+Once created, place all three icon files in this directory.
