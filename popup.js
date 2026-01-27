@@ -87,6 +87,9 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
       // Generate summary
       const summary = await generateSummary(transcript, video.title);
       appendSummary(i + 1, video, transcript, summary);
+
+      // Small pacing delay to reduce rate-limit risk
+      await sleep(750);
       
     } catch (error) {
       console.error(`Error processing video ${video.videoId}:`, error);
@@ -127,6 +130,30 @@ async function fetchTranscript(videoId) {
   }
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function parseOpenAIError(response) {
+  const contentType = response.headers.get('content-type') || '';
+  try {
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      const message = json?.error?.message || JSON.stringify(json);
+      return { message, json };
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  try {
+    const text = await response.text();
+    return { message: text || `HTTP ${response.status}`, json: null };
+  } catch (_) {
+    return { message: `HTTP ${response.status}`, json: null };
+  }
+}
+
 // Alternative method to fetch YouTube transcript
 async function fetchYouTubeTranscriptAlternative(videoId) {
   try {
@@ -160,41 +187,93 @@ async function fetchYouTubeTranscriptAlternative(videoId) {
 
 // Generate summary using OpenAI API
 async function generateSummary(transcript, videoTitle) {
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+  const model = 'gpt-4o-mini';
+  const transcriptSnippet = (transcript || '').substring(0, 6000);
+  const payload = {
+    model,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a helpful assistant that creates concise, educational summaries of video transcripts. Focus on key concepts, main points, and important details.'
       },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant that creates concise, educational summaries of video transcripts. Focus on key concepts, main points, and important details.'
-          },
-          {
-            role: 'user',
-            content: `Please provide a comprehensive summary of this video transcript titled "${videoTitle}":\n\n${transcript.substring(0, 12000)}`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      {
+        role: 'user',
+        content:
+          `Summarize the following transcript from a video titled "${videoTitle}". ` +
+          `Return 5-10 bullet points and a short 1-2 sentence takeaway at the end.\n\n` +
+          transcriptSnippet
+      }
+    ],
+    temperature: 0.4,
+    max_tokens: 450
+  };
+
+  const maxAttempts = 5;
+  let lastErrorMessage = '';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || 'No summary returned.';
+      }
+
+      const { message } = await parseOpenAIError(response);
+      lastErrorMessage = message;
+
+      // 429 often means either rate-limit OR "insufficient_quota".
+      // For rate-limit, we back off and retry; for quota issues, retrying won't help.
+      if (response.status === 429) {
+        const lower = (message || '').toLowerCase();
+        if (lower.includes('quota') || lower.includes('insufficient')) {
+          return `OpenAI API error 429 (quota). ${message} ` +
+            'Fix: add billing / credits in your OpenAI account, then retry.';
+        }
+
+        const retryAfterHeader = response.headers.get('retry-after');
+        const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+        const backoffMs = Number.isFinite(retryAfterSeconds)
+          ? Math.max(1, retryAfterSeconds) * 1000
+          : 1000 * Math.pow(2, attempt);
+
+        showStatus(`Rate-limited (429). Waiting ${Math.ceil(backoffMs / 1000)}s then retrying...`, 'info');
+        await sleep(backoffMs);
+        continue;
+      }
+
+      // Retry a few transient server/network errors
+      if ([500, 502, 503, 504].includes(response.status) && attempt < maxAttempts) {
+        const backoffMs = 750 * Math.pow(2, attempt);
+        showStatus(`OpenAI temporary error (${response.status}). Retrying in ${Math.ceil(backoffMs / 1000)}s...`, 'info');
+        await sleep(backoffMs);
+        continue;
+      }
+
+      return `OpenAI API error ${response.status}: ${message}`;
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      lastErrorMessage = error?.message || String(error);
+      const backoffMs = 750 * Math.pow(2, attempt);
+      if (attempt < maxAttempts) {
+        showStatus(`Network error talking to OpenAI. Retrying in ${Math.ceil(backoffMs / 1000)}s...`, 'info');
+        await sleep(backoffMs);
+        continue;
+      }
+      return `Error generating summary: ${lastErrorMessage}`;
     }
-    
-    const data = await response.json();
-    return data.choices[0].message.content;
-    
-  } catch (error) {
-    console.error('Error generating summary:', error);
-    return `Error generating summary: ${error.message}`;
   }
+
+  return `Error generating summary: ${lastErrorMessage || 'Unknown error'}`;
 }
 
 // Display scraped videos
