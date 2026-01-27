@@ -143,26 +143,22 @@ async function fetchTranscript(videoId) {
 }
 
 async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
-  const url = new URL('https://youtubetotranscript.com/');
-  url.searchParams.set('v', videoId);
-  if (apiKeyValue) {
-    url.searchParams.set('key', apiKeyValue);
-    url.searchParams.set('api_key', apiKeyValue);
-  }
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      'x-api-key': apiKeyValue || '',
-      'Authorization': apiKeyValue ? `Bearer ${apiKeyValue}` : ''
-    }
+  const response = await chrome.runtime.sendMessage({
+    action: 'fetchTranscriptFromYTT',
+    videoId,
+    apiKey: apiKeyValue || ''
   });
 
-  if (!response.ok) {
-    throw new Error(`YouTubeToTranscript error ${response.status}`);
+  if (!response || !response.success) {
+    throw new Error(response?.error || 'Failed to reach YouTubeToTranscript');
   }
 
-  const contentType = response.headers.get('content-type') || '';
-  const bodyText = await response.text();
+  const { ok, status, contentType, bodyText } = response;
+
+  if (!ok) {
+    const preview = (bodyText || '').slice(0, 200);
+    throw new Error(`YouTubeToTranscript error ${status}: ${preview || 'No response body'}`);
+  }
 
   if (contentType.includes('application/json') || bodyText.trim().startsWith('{')) {
     try {
