@@ -55,10 +55,12 @@ async function fetchTranscriptFromYTTInBackground(videoId, apiKeyValue) {
   const base = 'https://youtubetotranscript.com';
 
   const urlVariants = buildYttUrls(base, videoId, apiKeyValue);
+  const triedUrls = [];
 
   let lastResponse = null;
 
   for (const url of urlVariants) {
+    triedUrls.push(redactApiKey(url, apiKeyValue));
     const response = await fetch(url, {
       headers: {
         'x-api-key': apiKeyValue || '',
@@ -73,7 +75,8 @@ async function fetchTranscriptFromYTTInBackground(videoId, apiKeyValue) {
       ok: response.ok,
       status: response.status,
       contentType,
-      bodyText
+      bodyText,
+      triedUrls
     };
 
     if (response.ok) {
@@ -85,10 +88,15 @@ async function fetchTranscriptFromYTTInBackground(videoId, apiKeyValue) {
     ok: false,
     status: 0,
     contentType: '',
-    bodyText: 'No response from YouTubeToTranscript'
+    bodyText: 'No response from YouTubeToTranscript',
+    triedUrls
   };
 }
 
+function redactApiKey(url, apiKeyValue) {
+  if (!apiKeyValue) return url;
+  return url.replaceAll(apiKeyValue, 'REDACTED');
+}
 function buildYttUrls(base, videoId, apiKeyValue) {
   const endpoints = [
     '/',

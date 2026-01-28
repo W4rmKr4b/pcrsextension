@@ -150,27 +150,37 @@ async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
   });
 
   if (!response || !response.success) {
+    addDebug(`YTT background failure: ${response?.error || 'no response'}`);
     throw new Error(response?.error || 'Failed to reach YouTubeToTranscript');
   }
 
-  const { ok, status, contentType, bodyText } = response;
+  const { ok, status, contentType, bodyText, triedUrls } = response;
+
+  if (triedUrls?.length) {
+    addDebug(`YTT tried URLs:\n- ${triedUrls.join('\n- ')}`);
+  }
 
   if (!ok) {
     const preview = (bodyText || '').slice(0, 200);
+    addDebug(`YTT HTTP ${status} content-type=${contentType || 'n/a'} preview=${preview}`);
     throw new Error(`YouTubeToTranscript error ${status}: ${preview || 'No response body'}`);
   }
 
-  if (contentType.includes('application/json') || bodyText.trim().startsWith('{')) {
+  if ((contentType || '').includes('application/json') || bodyText.trim().startsWith('{')) {
     try {
       const data = JSON.parse(bodyText);
       const transcriptText = data?.transcript || data?.text || data?.data?.transcript;
-      return normalizeTranscriptText(transcriptText || '');
+      const normalized = normalizeTranscriptText(transcriptText || '');
+      addDebug(`YTT JSON parsed length=${normalized.length}`);
+      return normalized;
     } catch (error) {
-      console.warn('Failed to parse JSON transcript:', error);
+      addDebug(`YTT JSON parse error: ${error.message}`);
     }
   }
 
-  return extractTranscriptFromHtml(bodyText);
+  const extracted = extractTranscriptFromHtml(bodyText);
+  addDebug(`YTT HTML extracted length=${extracted.length}`);
+  return extracted;
 }
 
 function extractTranscriptFromHtml(htmlText) {
@@ -388,3 +398,41 @@ function showStatus(message, type = '') {
   statusDiv.textContent = message;
   statusDiv.className = `status ${type}`;
 }
+
+const debugLines = [];
+
+function addDebug(line) {
+  const stamp = new Date().toISOString().slice(11, 19);
+  debugLines.push(`[${stamp}] ${line}`);
+  const debugLog = document.getElementById('debugLog');
+  if (debugLog) {
+    debugLog.textContent = debugLines.slice(-50).join('\n');
+  }
+}
+
+document.getElementById('testYtt').addEventListener('click', async () => {
+  const input = document.getElementById('testVideoId');
+  const videoId = input.value.trim() || scrapedVideos?.[0]?.videoId;
+
+  if (!videoId) {
+    showStatus('Enter a video ID or scrape videos first.', 'error');
+    return;
+  }
+
+  showStatus(`Testing YTT for ${videoId}...`, 'info');
+  addDebug(`Test YTT started for videoId=${videoId}`);
+
+  try {
+    const transcript = await fetchTranscript(videoId);
+    if (transcript) {
+      showStatus(`YTT OK (${transcript.length} chars).`, 'success');
+      addDebug(`YTT OK: transcript length=${transcript.length}`);
+    } else {
+      showStatus('YTT returned empty transcript.', 'error');
+      addDebug('YTT returned empty transcript.');
+    }
+  } catch (error) {
+    showStatus(`YTT error: ${error.message}`, 'error');
+    addDebug(`YTT error: ${error.message}`);
+  }
+});
