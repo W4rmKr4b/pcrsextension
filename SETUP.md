@@ -62,7 +62,7 @@ python3 create_icons.py
 2. Click the extension icon
 3. Click "Scrape Videos"
 4. Click "Generate Summaries"
-5. Wait for AI-generated summaries to appear
+5. Wait for AI-generated summaries to appear (transcripts are fetched via YouTubeToTranscript only)
 
 ## Troubleshooting
 
@@ -80,6 +80,7 @@ python3 create_icons.py
 - Verify your YouTubeToTranscript API key is valid
 - Check you have credits in your OpenAI account
 - Make sure the keys have proper permissions
+- If YTT uses a different endpoint, update the URL list in `background.js`
 
 **Extension Not Loading:**
 - Ensure all files are in the same folder

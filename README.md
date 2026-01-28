@@ -1,11 +1,11 @@
 # PCRS Video Summarizer Chrome Extension
 
-A Chrome extension that scrapes YouTube videos from UofT's PCRS learning system, fetches transcripts, and generates AI-powered summaries using ChatGPT.
+A Chrome extension that scrapes YouTube videos from UofT's PCRS learning system, fetches transcripts via YouTubeToTranscript.com, and generates AI-powered summaries using ChatGPT.
 
 ## Features
 
 - 🎥 Automatically scrapes YouTube video links from PCRS pages
-- 📝 Fetches video transcripts via YouTubeToTranscript.com
+- 📝 Fetches video transcripts via YouTubeToTranscript.com (YTT only)
 - 🤖 Generates concise summaries using OpenAI's ChatGPT
 - 🔢 Enumerates summaries for easy reference
 - 💾 Stores your OpenAI API key securely in browser storage
@@ -83,7 +83,7 @@ pcrsextension/
 
 1. **Content Script** (`content.js`): Runs on PCRS pages and extracts YouTube video links
 2. **Popup** (`popup.html/js`): Provides the user interface for interacting with the extension
-3. **Transcript Fetching**: Uses YouTubeToTranscript.com to retrieve video transcripts
+3. **Transcript Fetching**: Uses YouTubeToTranscript.com only (no YouTube fallback)
 4. **Summary Generation**: Sends transcripts to OpenAI's GPT-3.5-turbo model for summarization
 5. **Display**: Shows enumerated summaries with video titles and transcript previews
 
@@ -96,8 +96,8 @@ pcrsextension/
 
 ### Transcript Availability
 - Not all YouTube videos have transcripts
-- The extension uses YouTubeToTranscript.com as the primary source
-- If a transcript isn't available, you'll see an error message for that video
+- The extension uses YouTubeToTranscript.com only
+- If YTT requires a different endpoint, update the URL list in `background.js` (`buildYttUrls`)
 
 ### PCRS Page Compatibility
 - The extension is configured to work on `*.utoronto.ca` and `*.pcrs.utoronto.ca` domains
@@ -112,8 +112,8 @@ pcrsextension/
 
 ### Transcript Errors
 - Some videos may not have transcripts available
-- Try checking if the video has closed captions on YouTube directly
-- The extension will skip videos without transcripts
+- The extension uses YouTubeToTranscript.com only
+- If YTT requires a different endpoint, update the URL list in `background.js` (`buildYttUrls`)
 
 ### API Errors
 - Verify both API keys are correct

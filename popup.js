@@ -247,37 +247,6 @@ async function parseOpenAIError(response) {
   }
 }
 
-// Alternative method to fetch YouTube transcript
-async function fetchYouTubeTranscriptAlternative(videoId) {
-  try {
-    // Use a more reliable method - YouTube's timedtext API
-    const response = await fetch(
-      `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}`
-    );
-    
-    if (response.ok) {
-      const xmlText = await response.text();
-      // Parse XML and extract text
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-      const textNodes = xmlDoc.getElementsByTagName('text');
-      
-      let transcript = '';
-      for (let node of textNodes) {
-        transcript += node.textContent + ' ';
-      }
-      
-      return transcript.trim() || 'Transcript not available for this video.';
-    }
-    
-    return 'Transcript not available for this video.';
-    
-  } catch (error) {
-    console.error('Error with alternative transcript method:', error);
-    return 'Transcript not available for this video.';
-  }
-}
-
 // Generate summary using OpenAI API
 async function generateSummary(transcript, videoTitle) {
   const model = 'gpt-4o-mini';

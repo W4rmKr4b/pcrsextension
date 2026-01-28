@@ -52,36 +52,73 @@ async function fetchTranscriptInBackground(videoId) {
 }
 
 async function fetchTranscriptFromYTTInBackground(videoId, apiKeyValue) {
-  const url = new URL('https://youtubetotranscript.com/');
-  url.searchParams.set('v', videoId);
-  if (apiKeyValue) {
-    url.searchParams.set('key', apiKeyValue);
-    url.searchParams.set('api_key', apiKeyValue);
-  }
+  const base = 'https://youtubetotranscript.com';
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      'x-api-key': apiKeyValue || '',
-      'Authorization': apiKeyValue ? `Bearer ${apiKeyValue}` : ''
-    }
-  });
+  const urlVariants = buildYttUrls(base, videoId, apiKeyValue);
 
-  const contentType = response.headers.get('content-type') || '';
-  const bodyText = await response.text();
+  let lastResponse = null;
 
-  if (!response.ok) {
-    return {
-      ok: false,
+  for (const url of urlVariants) {
+    const response = await fetch(url, {
+      headers: {
+        'x-api-key': apiKeyValue || '',
+        'Authorization': apiKeyValue ? `Bearer ${apiKeyValue}` : ''
+      }
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    const bodyText = await response.text();
+
+    lastResponse = {
+      ok: response.ok,
       status: response.status,
       contentType,
       bodyText
     };
+
+    if (response.ok) {
+      return lastResponse;
+    }
   }
 
-  return {
-    ok: true,
-    status: response.status,
-    contentType,
-    bodyText
+  return lastResponse || {
+    ok: false,
+    status: 0,
+    contentType: '',
+    bodyText: 'No response from YouTubeToTranscript'
   };
+}
+
+function buildYttUrls(base, videoId, apiKeyValue) {
+  const endpoints = [
+    '/',
+    '/api/transcript',
+    '/api/v1/transcript',
+    '/api/transcripts'
+  ];
+
+  const paramSets = [
+    [['v', videoId]],
+    [['video_id', videoId]],
+    [['videoId', videoId]],
+    [['id', videoId]]
+  ];
+
+  const urls = [];
+
+  for (const endpoint of endpoints) {
+    for (const params of paramSets) {
+      const url = new URL(endpoint, base);
+      for (const [key, value] of params) {
+        url.searchParams.set(key, value);
+      }
+      if (apiKeyValue) {
+        url.searchParams.set('key', apiKeyValue);
+        url.searchParams.set('api_key', apiKeyValue);
+      }
+      urls.push(url.toString());
+    }
+  }
+
+  return urls;
 }
