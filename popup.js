@@ -135,11 +135,23 @@ async function fetchTranscript(videoId) {
     if (transcript) {
       return transcript;
     }
-    return null;
+    addDebug('YTT returned empty transcript, falling back to YouTube timedtext.');
   } catch (error) {
     console.error('Error fetching transcript:', error);
-    return null;
+    addDebug(`YTT error: ${error.message}. Falling back to YouTube timedtext.`);
   }
+
+  try {
+    const fallbackTranscript = await fetchTranscriptFromYouTube(videoId);
+    if (fallbackTranscript) {
+      return fallbackTranscript;
+    }
+  } catch (error) {
+    console.error('Error fetching YouTube transcript:', error);
+    addDebug(`YouTube timedtext error: ${error.message}`);
+  }
+
+  return null;
 }
 
 async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
@@ -224,6 +236,21 @@ function extractTranscriptFromHtml(htmlText) {
   }
 
   return '';
+}
+
+async function fetchTranscriptFromYouTube(videoId) {
+  const response = await chrome.runtime.sendMessage({
+    action: 'fetchTranscript',
+    videoId
+  });
+
+  if (!response || !response.success) {
+    throw new Error(response?.error || 'Failed to fetch YouTube transcript');
+  }
+
+  const normalized = normalizeTranscriptText(response.transcript || '');
+  addDebug(`YouTube timedtext length=${normalized.length}`);
+  return normalized;
 }
 
 function normalizeTranscriptText(text) {
