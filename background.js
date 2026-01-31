@@ -33,16 +33,11 @@ async function fetchTranscriptInBackground(videoId) {
     
     if (response.ok) {
       const xmlText = await response.text();
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-      const textNodes = xmlDoc.getElementsByTagName('text');
-      
-      let transcript = '';
-      for (let node of textNodes) {
-        transcript += node.textContent + ' ';
+      const transcript = extractTranscriptFromTimedText(xmlText);
+      if (!transcript) {
+        throw new Error('Transcript not available');
       }
-      
-      return transcript.trim();
+      return transcript;
     }
     
     throw new Error('Transcript not available');
@@ -129,4 +124,38 @@ function buildYttUrls(base, videoId, apiKeyValue) {
   }
 
   return urls;
+}
+
+function extractTranscriptFromTimedText(xmlText) {
+  const textNodes = [];
+  const regex = /<text[^>]*>([\s\S]*?)<\/text>/g;
+  for (const match of xmlText.matchAll(regex)) {
+    const rawText = match[1].replace(/<br\s*\/?>/gi, '\n');
+    const decoded = decodeXmlEntities(rawText);
+    if (decoded) {
+      textNodes.push(decoded);
+    }
+  }
+
+  return textNodes.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function decodeXmlEntities(text) {
+  if (!text) return '';
+  let decoded = text.replace(/&amp;/g, '&');
+  decoded = decoded
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'");
+  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+    const code = Number.parseInt(hex, 16);
+    return Number.isNaN(code) ? _ : String.fromCodePoint(code);
+  });
+  decoded = decoded.replace(/&#(\d+);/g, (_, num) => {
+    const code = Number.parseInt(num, 10);
+    return Number.isNaN(code) ? _ : String.fromCodePoint(code);
+  });
+  return decoded;
 }
