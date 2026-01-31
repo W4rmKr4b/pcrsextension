@@ -42,30 +42,30 @@ document.getElementById('saveYttApiKey').addEventListener('click', async () => {
   }
 });
 
-// Scrape videos from current page
-document.getElementById('scrapeVideos').addEventListener('click', async () => {
+async function scrapeVideosFromCurrentTab() {
   showStatus('Scraping videos from page...', 'info');
-  
+
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
     const response = await chrome.tabs.sendMessage(tab.id, { action: 'getYouTubeLinks' });
-    
+
     if (response && response.links && response.links.length > 0) {
       scrapedVideos = response.links;
       displayVideos(scrapedVideos);
       showStatus(`Found ${scrapedVideos.length} video(s)!`, 'success');
-      document.getElementById('generateSummaries').disabled = false;
-    } else {
-      showStatus('No YouTube videos found on this page.', 'error');
-      scrapedVideos = [];
-      document.getElementById('generateSummaries').disabled = true;
+      return true;
     }
+
+    showStatus('No YouTube videos found on this page.', 'error');
+    scrapedVideos = [];
+    return false;
   } catch (error) {
     console.error('Error scraping videos:', error);
     showStatus('Error: Make sure you are on a PCRS page.', 'error');
+    scrapedVideos = [];
+    return false;
   }
-});
+}
 
 // Generate summaries for all videos
 document.getElementById('generateSummaries').addEventListener('click', async () => {
@@ -87,14 +87,16 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
     yttApiKey = result.yttApiKey;
   }
   
-  if (scrapedVideos.length === 0) {
-    showStatus('No videos to summarize. Please scrape videos first.', 'error');
+  document.getElementById('generateSummaries').disabled = true;
+
+  const foundVideos = await scrapeVideosFromCurrentTab();
+  if (!foundVideos || scrapedVideos.length === 0) {
+    document.getElementById('generateSummaries').disabled = false;
     return;
   }
-  
+
   showStatus('Fetching transcripts and generating summaries...', 'info');
-  document.getElementById('generateSummaries').disabled = true;
-  
+
   const summariesContainer = document.getElementById('summaries');
   summariesContainer.innerHTML = '';
   
