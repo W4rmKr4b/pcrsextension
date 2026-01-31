@@ -178,13 +178,20 @@ async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
     throw new Error(`YouTubeToTranscript error ${status}: ${preview || 'No response body'}`);
   }
 
-  if ((contentType || '').includes('application/json') || bodyText.trim().startsWith('{')) {
+  if ((contentType || '').includes('application/json') || /^[{\[]/.test(bodyText.trim())) {
     try {
       const data = JSON.parse(bodyText);
       const transcriptText = data?.transcript || data?.text || data?.data?.transcript;
+      const arrayTranscript = extractTranscriptFromArray(data);
       const normalized = normalizeTranscriptText(transcriptText || '');
+      const normalizedArray = normalizeTranscriptText(arrayTranscript || '');
       addDebug(`YTT JSON parsed length=${normalized.length}`);
-      return normalized;
+      if (normalized) {
+        return normalized;
+      }
+      if (normalizedArray) {
+        return normalizedArray;
+      }
     } catch (error) {
       addDebug(`YTT JSON parse error: ${error.message}`);
     }
@@ -235,6 +242,17 @@ function extractTranscriptFromHtml(htmlText) {
     console.warn('Failed to parse YouTubeToTranscript HTML:', error);
   }
 
+  return '';
+}
+
+function extractTranscriptFromArray(data) {
+  if (!data) return '';
+  if (Array.isArray(data)) {
+    return data.map(item => item?.text || '').join(' ');
+  }
+  if (Array.isArray(data?.data)) {
+    return data.data.map(item => item?.text || '').join(' ');
+  }
   return '';
 }
 
