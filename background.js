@@ -48,6 +48,10 @@ async function fetchTranscriptInBackground(videoId) {
           return trackTranscript;
         }
       }
+      if (!transcript) {
+        throw new Error('Transcript not available');
+      }
+      return transcript;
     }
 
     throw new Error('Transcript not available');
