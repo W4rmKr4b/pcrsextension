@@ -135,11 +135,23 @@ async function fetchTranscript(videoId) {
     if (transcript) {
       return transcript;
     }
-    return null;
+    addDebug('YTT returned empty transcript, falling back to YouTube timedtext.');
   } catch (error) {
     console.error('Error fetching transcript:', error);
-    return null;
+    addDebug(`YTT error: ${error.message}. Falling back to YouTube timedtext.`);
   }
+
+  try {
+    const fallbackTranscript = await fetchTranscriptFromYouTube(videoId);
+    if (fallbackTranscript) {
+      return fallbackTranscript;
+    }
+  } catch (error) {
+    console.error('Error fetching YouTube transcript:', error);
+    addDebug(`YouTube timedtext error: ${error.message}`);
+  }
+
+  return null;
 }
 
 async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
@@ -166,13 +178,20 @@ async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
     throw new Error(`YouTubeToTranscript error ${status}: ${preview || 'No response body'}`);
   }
 
-  if ((contentType || '').includes('application/json') || bodyText.trim().startsWith('{')) {
+  if ((contentType || '').includes('application/json') || /^[{\[]/.test(bodyText.trim())) {
     try {
       const data = JSON.parse(bodyText);
       const transcriptText = data?.transcript || data?.text || data?.data?.transcript;
+      const arrayTranscript = extractTranscriptFromArray(data);
       const normalized = normalizeTranscriptText(transcriptText || '');
+      const normalizedArray = normalizeTranscriptText(arrayTranscript || '');
       addDebug(`YTT JSON parsed length=${normalized.length}`);
-      return normalized;
+      if (normalized) {
+        return normalized;
+      }
+      if (normalizedArray) {
+        return normalizedArray;
+      }
     } catch (error) {
       addDebug(`YTT JSON parse error: ${error.message}`);
     }
@@ -224,6 +243,32 @@ function extractTranscriptFromHtml(htmlText) {
   }
 
   return '';
+}
+
+function extractTranscriptFromArray(data) {
+  if (!data) return '';
+  if (Array.isArray(data)) {
+    return data.map(item => item?.text || '').join(' ');
+  }
+  if (Array.isArray(data?.data)) {
+    return data.data.map(item => item?.text || '').join(' ');
+  }
+  return '';
+}
+
+async function fetchTranscriptFromYouTube(videoId) {
+  const response = await chrome.runtime.sendMessage({
+    action: 'fetchTranscript',
+    videoId
+  });
+
+  if (!response || !response.success) {
+    throw new Error(response?.error || 'Failed to fetch YouTube transcript');
+  }
+
+  const normalized = normalizeTranscriptText(response.transcript || '');
+  addDebug(`YouTube timedtext length=${normalized.length}`);
+  return normalized;
 }
 
 function normalizeTranscriptText(text) {
