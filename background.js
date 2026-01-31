@@ -50,6 +50,25 @@ async function fetchTranscriptInBackground(videoId) {
       }
     }
 
+      }
+    }
+
+    const track = await fetchTimedTextTrack(videoId);
+    if (track) {
+      const trackResponse = await fetch(track.url);
+      if (trackResponse.ok) {
+        const trackXml = await trackResponse.text();
+        const trackTranscript = extractTranscriptFromTimedText(trackXml);
+        if (trackTranscript) {
+          return trackTranscript;
+        }
+      }
+      if (!transcript) {
+        throw new Error('Transcript not available');
+      }
+      return transcript;
+    }
+
     throw new Error('Transcript not available');
   } catch (error) {
     throw error;
