@@ -67,19 +67,6 @@ async function scrapeVideosFromCurrentTab() {
   }
 }
 
-async function sendToActiveTab(message) {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) {
-      throw new Error('No active tab found');
-    }
-    return await chrome.tabs.sendMessage(tab.id, message);
-  } catch (error) {
-    addDebug(`Page injection error: ${error.message}`);
-    return null;
-  }
-}
-
 // Generate summaries for all videos
 document.getElementById('generateSummaries').addEventListener('click', async () => {
   if (!apiKey || apiKey === '••••••••') {
@@ -107,8 +94,6 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
     document.getElementById('generateSummaries').disabled = false;
     return;
   }
-
-  await sendToActiveTab({ action: 'resetSummaries' });
 
   showStatus('Fetching transcripts and generating summaries...', 'info');
 
