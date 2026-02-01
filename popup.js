@@ -42,30 +42,43 @@ document.getElementById('saveYttApiKey').addEventListener('click', async () => {
   }
 });
 
-// Scrape videos from current page
-document.getElementById('scrapeVideos').addEventListener('click', async () => {
+async function scrapeVideosFromCurrentTab() {
   showStatus('Scraping videos from page...', 'info');
-  
+
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
     const response = await chrome.tabs.sendMessage(tab.id, { action: 'getYouTubeLinks' });
-    
+
     if (response && response.links && response.links.length > 0) {
       scrapedVideos = response.links;
       displayVideos(scrapedVideos);
       showStatus(`Found ${scrapedVideos.length} video(s)!`, 'success');
-      document.getElementById('generateSummaries').disabled = false;
-    } else {
-      showStatus('No YouTube videos found on this page.', 'error');
-      scrapedVideos = [];
-      document.getElementById('generateSummaries').disabled = true;
+      return true;
     }
+
+    showStatus('No YouTube videos found on this page.', 'error');
+    scrapedVideos = [];
+    return false;
   } catch (error) {
     console.error('Error scraping videos:', error);
     showStatus('Error: Make sure you are on a PCRS page.', 'error');
+    scrapedVideos = [];
+    return false;
   }
-});
+}
+
+async function sendToActiveTab(message) {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      throw new Error('No active tab found');
+    }
+    return await chrome.tabs.sendMessage(tab.id, message);
+  } catch (error) {
+    addDebug(`Page injection error: ${error.message}`);
+    return null;
+  }
+}
 
 // Generate summaries for all videos
 document.getElementById('generateSummaries').addEventListener('click', async () => {
@@ -87,14 +100,18 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
     yttApiKey = result.yttApiKey;
   }
   
-  if (scrapedVideos.length === 0) {
-    showStatus('No videos to summarize. Please scrape videos first.', 'error');
+  document.getElementById('generateSummaries').disabled = true;
+
+  const foundVideos = await scrapeVideosFromCurrentTab();
+  if (!foundVideos || scrapedVideos.length === 0) {
+    document.getElementById('generateSummaries').disabled = false;
     return;
   }
-  
+
+  await sendToActiveTab({ action: 'resetSummaries' });
+
   showStatus('Fetching transcripts and generating summaries...', 'info');
-  document.getElementById('generateSummaries').disabled = true;
-  
+
   const summariesContainer = document.getElementById('summaries');
   summariesContainer.innerHTML = '';
   
@@ -108,12 +125,30 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
       
       if (!transcript) {
         appendSummary(i + 1, video, null, 'Failed to fetch transcript');
+        await sendToActiveTab({
+          action: 'appendSummary',
+          summary: {
+            index: i + 1,
+            title: video.title,
+            videoId: video.videoId,
+            error: 'Failed to fetch transcript'
+          }
+        });
         continue;
       }
       
       // Generate summary
       const summary = await generateSummary(transcript, video.title);
       appendSummary(i + 1, video, transcript, summary);
+      await sendToActiveTab({
+        action: 'appendSummary',
+        summary: {
+          index: i + 1,
+          title: video.title,
+          videoId: video.videoId,
+          summary
+        }
+      });
 
       // Small pacing delay to reduce rate-limit risk
       await sleep(750);
@@ -121,6 +156,15 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
     } catch (error) {
       console.error(`Error processing video ${video.videoId}:`, error);
       appendSummary(i + 1, video, null, `Error: ${error.message}`);
+      await sendToActiveTab({
+        action: 'appendSummary',
+        summary: {
+          index: i + 1,
+          title: video.title,
+          videoId: video.videoId,
+          error: `Error: ${error.message}`
+        }
+      });
     }
   }
   
@@ -135,11 +179,23 @@ async function fetchTranscript(videoId) {
     if (transcript) {
       return transcript;
     }
-    return null;
+    addDebug('YTT returned empty transcript, falling back to YouTube timedtext.');
   } catch (error) {
     console.error('Error fetching transcript:', error);
-    return null;
+    addDebug(`YTT error: ${error.message}. Falling back to YouTube timedtext.`);
   }
+
+  try {
+    const fallbackTranscript = await fetchTranscriptFromYouTube(videoId);
+    if (fallbackTranscript) {
+      return fallbackTranscript;
+    }
+  } catch (error) {
+    console.error('Error fetching YouTube transcript:', error);
+    addDebug(`YouTube timedtext error: ${error.message}`);
+  }
+
+  return null;
 }
 
 async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
@@ -166,13 +222,20 @@ async function fetchTranscriptFromYTT(videoId, apiKeyValue) {
     throw new Error(`YouTubeToTranscript error ${status}: ${preview || 'No response body'}`);
   }
 
-  if ((contentType || '').includes('application/json') || bodyText.trim().startsWith('{')) {
+  if ((contentType || '').includes('application/json') || /^[{\[]/.test(bodyText.trim())) {
     try {
       const data = JSON.parse(bodyText);
       const transcriptText = data?.transcript || data?.text || data?.data?.transcript;
+      const arrayTranscript = extractTranscriptFromArray(data);
       const normalized = normalizeTranscriptText(transcriptText || '');
+      const normalizedArray = normalizeTranscriptText(arrayTranscript || '');
       addDebug(`YTT JSON parsed length=${normalized.length}`);
-      return normalized;
+      if (normalized) {
+        return normalized;
+      }
+      if (normalizedArray) {
+        return normalizedArray;
+      }
     } catch (error) {
       addDebug(`YTT JSON parse error: ${error.message}`);
     }
@@ -224,6 +287,32 @@ function extractTranscriptFromHtml(htmlText) {
   }
 
   return '';
+}
+
+function extractTranscriptFromArray(data) {
+  if (!data) return '';
+  if (Array.isArray(data)) {
+    return data.map(item => item?.text || '').join(' ');
+  }
+  if (Array.isArray(data?.data)) {
+    return data.data.map(item => item?.text || '').join(' ');
+  }
+  return '';
+}
+
+async function fetchTranscriptFromYouTube(videoId) {
+  const response = await chrome.runtime.sendMessage({
+    action: 'fetchTranscript',
+    videoId
+  });
+
+  if (!response || !response.success) {
+    throw new Error(response?.error || 'Failed to fetch YouTube transcript');
+  }
+
+  const normalized = normalizeTranscriptText(response.transcript || '');
+  addDebug(`YouTube timedtext length=${normalized.length}`);
+  return normalized;
 }
 
 function normalizeTranscriptText(text) {
