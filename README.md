@@ -5,9 +5,10 @@ A Chrome extension that scrapes YouTube videos from UofT's PCRS learning system,
 ## Features
 
 - 🎥 Automatically scrapes YouTube video links from PCRS pages
-- 📝 Fetches video transcripts via YouTubeToTranscript.com (YTT only)
+- 📝 Fetches video transcripts via YouTubeToTranscript.com with a YouTube timedtext fallback
 - 🤖 Generates concise summaries using OpenAI's ChatGPT
 - 🔢 Enumerates summaries for easy reference
+- 🧾 Injects summaries into the PCRS page for quick review
 - 💾 Stores your OpenAI API key securely in browser storage
 
 ## Installation
@@ -59,9 +60,9 @@ Place these PNG files in the extension's root directory.
 
 1. After scraping videos, click "Generate Summaries"
 2. Wait while the extension:
-   - Fetches transcripts for each video
+   - Fetches transcripts for each video (YTT first, YouTube timedtext fallback)
    - Sends them to ChatGPT for summarization
-3. View numbered summaries in the popup
+3. View numbered summaries in the popup and on the PCRS page
 
 ## File Structure
 
@@ -83,9 +84,9 @@ pcrsextension/
 
 1. **Content Script** (`content.js`): Runs on PCRS pages and extracts YouTube video links
 2. **Popup** (`popup.html/js`): Provides the user interface for interacting with the extension
-3. **Transcript Fetching**: Uses YouTubeToTranscript.com only (no YouTube fallback)
-4. **Summary Generation**: Sends transcripts to OpenAI's GPT-3.5-turbo model for summarization
-5. **Display**: Shows enumerated summaries with video titles and transcript previews
+3. **Transcript Fetching**: Uses YouTubeToTranscript.com first, with a YouTube timedtext fallback
+4. **Summary Generation**: Sends transcripts to OpenAI's gpt-4o-mini model for summarization
+5. **Display**: Shows enumerated summaries in the popup and injects them on the PCRS page
 
 ## Important Notes
 
@@ -96,7 +97,7 @@ pcrsextension/
 
 ### Transcript Availability
 - Not all YouTube videos have transcripts
-- The extension uses YouTubeToTranscript.com only
+- The extension uses YouTubeToTranscript.com first, then YouTube timedtext fallback
 - If YTT requires a different endpoint, update the URL list in `background.js` (`buildYttUrls`)
 
 ### PCRS Page Compatibility
@@ -112,7 +113,7 @@ pcrsextension/
 
 ### Transcript Errors
 - Some videos may not have transcripts available
-- The extension uses YouTubeToTranscript.com only
+- The extension uses YouTubeToTranscript.com first, then YouTube timedtext fallback
 - If YTT requires a different endpoint, update the URL list in `background.js` (`buildYttUrls`)
 
 ### API Errors

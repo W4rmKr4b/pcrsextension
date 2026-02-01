@@ -110,12 +110,30 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
       
       if (!transcript) {
         appendSummary(i + 1, video, null, 'Failed to fetch transcript');
+        await sendToActiveTab({
+          action: 'appendSummary',
+          summary: {
+            index: i + 1,
+            title: video.title,
+            videoId: video.videoId,
+            error: 'Failed to fetch transcript'
+          }
+        });
         continue;
       }
       
       // Generate summary
       const summary = await generateSummary(transcript, video.title);
       appendSummary(i + 1, video, transcript, summary);
+      await sendToActiveTab({
+        action: 'appendSummary',
+        summary: {
+          index: i + 1,
+          title: video.title,
+          videoId: video.videoId,
+          summary
+        }
+      });
 
       // Small pacing delay to reduce rate-limit risk
       await sleep(750);
@@ -123,6 +141,15 @@ document.getElementById('generateSummaries').addEventListener('click', async () 
     } catch (error) {
       console.error(`Error processing video ${video.videoId}:`, error);
       appendSummary(i + 1, video, null, `Error: ${error.message}`);
+      await sendToActiveTab({
+        action: 'appendSummary',
+        summary: {
+          index: i + 1,
+          title: video.title,
+          videoId: video.videoId,
+          error: `Error: ${error.message}`
+        }
+      });
     }
   }
   
